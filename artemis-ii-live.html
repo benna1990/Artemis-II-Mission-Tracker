@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis II — Live Missietracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
+:root {
+  --bg:#04080f; --border:rgba(100,160,255,0.13); --accent:#5aaeff; --accent2:#00e0b0;
+  --warn:#ffb347; --live:#ff4757; --text:#dde8f8; --text-dim:#8faac8; --muted:#3d5a7a;
+  --mono:'Share Tech Mono',monospace; --display:'Barlow Condensed',sans-serif; --body:'Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.5;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:
+  radial-gradient(1px 1px at 8% 12%,rgba(255,255,255,0.5) 0%,transparent 100%),
+  radial-gradient(1.5px 1.5px at 40% 5%,rgba(255,255,255,0.6) 0%,transparent 100%),
+  radial-gradient(1px 1px at 70% 17%,rgba(255,255,255,0.5) 0%,transparent 100%),
+  radial-gradient(2px 2px at 83% 50%,rgba(255,255,255,0.35) 0%,transparent 100%),
+  radial-gradient(1px 1px at 15% 70%,rgba(255,255,255,0.28) 0%,transparent 100%),
+  radial-gradient(1.5px 1.5px at 60% 80%,rgba(255,255,255,0.45) 0%,transparent 100%),
+  radial-gradient(1px 1px at 48% 60%,rgba(255,255,255,0.4) 0%,transparent 100%);
+  pointer-events:none;z-index:0;}
+
+/* HEADER */
+header{position:relative;z-index:10;padding:20px 16px 14px;background:linear-gradient(180deg,rgba(0,18,55,0.98) 0%,rgba(4,8,15,0.7) 100%);text-align:center;}
+.mission-label{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:3px;}
+header h1{font-family:var(--display);font-weight:900;font-size:clamp(28px,8vw,52px);letter-spacing:2px;line-height:1;margin:4px 0 2px;background:linear-gradient(135deg,#fff 0%,#a8d4ff 50%,#48cae4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.mission-tagline{font-family:var(--display);font-weight:400;font-size:11px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;}
+.crew-row{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin-bottom:14px;}
+.crew-chip{background:rgba(90,174,255,0.1);border:1px solid rgba(90,174,255,0.2);border-radius:20px;padding:3px 10px;font-size:11px;color:#b8d8ff;font-weight:600;}
+
+/* CLOCKS */
+.clock-panel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;max-width:600px;margin:0 auto 12px;padding:0 12px;}
+.clock-box{background:rgba(8,14,28,0.97);border:1px solid var(--border);border-radius:10px;padding:9px 8px;text-align:center;}
+.clock-label{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.clock-value{font-family:var(--mono);font-size:clamp(11px,3vw,17px);color:var(--accent);letter-spacing:1px;}
+.clock-value.green{color:var(--accent2);} .clock-value.orange{color:var(--warn);}
+
+/* PROGRESS */
+.progress-section{max-width:600px;margin:0 auto 12px;padding:0 12px;}
+.progress-bar-wrap{background:rgba(255,255,255,0.06);border-radius:4px;height:5px;overflow:hidden;margin-bottom:5px;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width 1s linear;position:relative;}
+.progress-bar-fill::after{content:'';position:absolute;right:-1px;top:-3px;width:2px;height:11px;background:white;border-radius:2px;box-shadow:0 0 5px white;}
+.progress-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--muted);}
+
+/* PHASE BANNER */
+.current-phase{max-width:600px;margin:0 auto 10px;padding:0 12px;}
+.phase-card{background:rgba(8,14,28,0.97);border:1px solid rgba(90,174,255,0.28);border-radius:12px;padding:12px 15px 12px 19px;position:relative;overflow:hidden;}
+.phase-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--accent),var(--accent2));}
+.live-dot{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:var(--live);letter-spacing:1.5px;margin-bottom:4px;font-weight:700;}
+.live-dot::before{content:'';width:7px;height:7px;background:var(--live);border-radius:50%;animation:blink 1.2s infinite;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--live);}50%{opacity:.2;box-shadow:none;}}
+.phase-title{font-family:var(--display);font-weight:700;font-size:17px;color:#fff;margin-bottom:3px;line-height:1.2;}
+.phase-desc{font-size:12.5px;color:#c0d8f0;line-height:1.45;}
+.phase-next{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);font-family:var(--mono);font-size:10px;color:var(--accent2);line-height:1.4;}
+
+/* TELEMETRY */
+.telem-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;max-width:600px;margin:0 auto 10px;padding:0 12px;}
+.telem-box{background:rgba(8,14,28,0.97);border:1px solid var(--border);border-radius:10px;padding:9px 8px;text-align:center;}
+.telem-label{font-family:var(--mono);font-size:8.5px;color:var(--text-dim);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px;line-height:1.3;}
+.telem-value{font-family:var(--mono);font-size:clamp(11px,2.8vw,16px);color:var(--accent2);font-weight:700;letter-spacing:.5px;}
+.telem-unit{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:1px;}
+
+/* MAP */
+.map-section{max-width:600px;margin:0 auto 10px;padding:0 12px;}
+.map-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+#missionMap{width:100%;height:auto;border-radius:10px;border:1px solid var(--border);background:rgba(4,8,20,0.95);display:block;}
+.map-legend{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;}
+.map-legend span{font-family:var(--mono);font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+
+/* LEGEND */
+.legend{max-width:600px;margin:0 auto 8px;padding:0 12px;display:flex;flex-wrap:wrap;gap:5px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim);font-family:var(--mono);}
+.legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+
+.source-note{text-align:center;font-family:var(--mono);font-size:9px;color:var(--muted);padding:0 12px 9px;max-width:600px;margin:0 auto;}
+
+/* TIMELINE */
+.timeline-wrap{max-width:600px;margin:0 auto;padding:0 12px 60px;position:relative;z-index:10;}
+.day-section{margin-bottom:6px;border-radius:12px;overflow:hidden;border:1px solid var(--border);transition:border-color .3s,box-shadow .3s;}
+.day-section.active-day{border-color:rgba(90,174,255,0.45);box-shadow:0 0 22px rgba(90,174,255,0.09);}
+.day-section.past-day{opacity:.45;}
+.day-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;background:rgba(8,14,28,0.98);user-select:none;transition:background .2s;}
+.day-header:hover{background:rgba(18,32,60,0.99);}
+.day-num{font-family:var(--display);font-weight:900;font-size:28px;line-height:1;min-width:30px;text-align:center;flex-shrink:0;}
+.day-meta{flex:1;min-width:0;}
+.day-meta .d-date{font-family:var(--mono);font-size:9.5px;color:var(--text-dim);}
+.day-meta .d-title{font-family:var(--display);font-weight:700;font-size:14px;color:#e0eeff;line-height:1.2;}
+.day-emoji{font-size:18px;flex-shrink:0;}
+.day-status{font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
+.status-done{background:rgba(72,202,228,.10);color:#7dd8e8;border:1px solid rgba(72,202,228,.22);}
+.status-live{background:rgba(255,71,87,.13);color:#ff8892;border:1px solid rgba(255,71,87,.3);animation:blink 1.2s infinite;}
+.status-upcoming{background:rgba(90,174,255,.06);color:var(--muted);border:1px solid rgba(90,174,255,.1);}
+.chevron{font-size:10px;color:var(--muted);transition:transform .3s;flex-shrink:0;}
+.day-section.open .chevron{transform:rotate(180deg);}
+.events-wrap{display:none;background:rgba(5,10,20,0.99);border-top:1px solid rgba(255,255,255,.05);}
+.day-section.open .events-wrap{display:block;}
+.event-row{display:flex;border-bottom:1px solid rgba(255,255,255,.04);position:relative;transition:background .2s;}
+.event-row:last-child{border-bottom:none;}
+.event-row.current-event{background:rgba(90,174,255,.08);}
+.event-row.current-event::before{content:'▶';position:absolute;left:5px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:8px;}
+.event-row.past-event{opacity:.38;}
+.event-row .type-bar{width:3px;flex-shrink:0;}
+.type-sleep .type-bar{background:#2e7eb8;} .type-meal .type-bar{background:#6aab2a;}
+.type-exercise .type-bar{background:#9b4dca;} .type-burn .type-bar{background:#e84118;}
+.type-sys .type-bar{background:#5aaeff;} .type-sci .type-bar{background:#a044ff;}
+.type-comm .type-bar{background:#00e0b0;} .type-med .type-bar{background:#ff9f43;}
+.type-key .type-bar{background:#ffd32a;}
+.e-time-col{min-width:64px;padding:10px 7px 10px 13px;border-right:1px solid rgba(255,255,255,.05);flex-shrink:0;display:flex;flex-direction:column;justify-content:flex-start;gap:2px;}
+.e-time{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;font-weight:700;}
+.e-met{font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap;}
+.e-content{padding:10px 13px;flex:1;min-width:0;}
+.e-icon-title{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
+.e-icon{font-size:15px;flex-shrink:0;}
+.e-title{font-family:var(--display);font-weight:700;font-size:14px;color:#eaf3ff;line-height:1.2;}
+.e-desc{font-size:12.5px;color:#b8cfe8;line-height:1.45;}
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(90,174,255,.2);border-radius:4px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="mission-label">NASA · ESA · CSA &nbsp;·&nbsp; Live Missietracker</div>
+  <h1>ARTEMIS II</h1>
+  <div class="mission-tagline">Eerste bemande maanvlucht sinds Apollo 17 · 1972</div>
+  <div class="crew-row">
+    <span class="crew-chip">👨‍✈️ Reid Wiseman CDR</span>
+    <span class="crew-chip">🧑‍✈️ Victor Glover PLT</span>
+    <span class="crew-chip">👩‍🚀 Christina Koch MS</span>
+    <span class="crew-chip">🧑‍🚀 Jeremy Hansen MS</span>
+  </div>
+  <div class="clock-panel">
+    <div class="clock-box"><div class="clock-label">🇳🇱 Ned. Tijd</div><div class="clock-value" id="nlTime">--:--:--</div></div>
+    <div class="clock-box"><div class="clock-label">⏱ Missietijd</div><div class="clock-value green" id="missionTime">T+--:--</div></div>
+    <div class="clock-box"><div class="clock-label">⏳ Tot splashdown</div><div class="clock-value orange" id="toSplash">--d --h</div></div>
+  </div>
+</header>
+
+<div class="progress-section">
+  <div class="progress-bar-wrap"><div class="progress-bar-fill" id="missionProgress" style="width:0%"></div></div>
+  <div class="progress-labels"><span>LANCERING</span><span id="progressPct">0%</span><span>SPLASHDOWN</span></div>
+</div>
+
+<div class="current-phase">
+  <div class="phase-card">
+    <div class="live-dot">NU LIVE</div>
+    <div class="phase-title" id="currentPhaseTitle">Berekenen…</div>
+    <div class="phase-desc" id="currentPhaseDesc"></div>
+    <div class="phase-next" id="currentPhaseNext"></div>
+  </div>
+</div>
+
+<!-- TELEMETRY -->
+<div class="telem-grid">
+  <div class="telem-box"><div class="telem-label">🌍 Afstand Aarde</div><div class="telem-value" id="tEarth">—</div><div class="telem-unit">km</div></div>
+  <div class="telem-box"><div class="telem-label">🌕 Afstand Maan</div><div class="telem-value" id="tMoon">—</div><div class="telem-unit">km</div></div>
+  <div class="telem-box"><div class="telem-label">🚀 Snelheid</div><div class="telem-value" id="tSpeed">—</div><div class="telem-unit">km/h</div></div>
+  <div class="telem-box"><div class="telem-label">📡 Signaalvertraging</div><div class="telem-value" id="tDelay">—</div><div class="telem-unit">seconden</div></div>
+</div>
+
+<!-- MAP -->
+<div class="map-section">
+  <div class="map-label">🗺️ Vluchttraject — Aarde–Maan systeem</div>
+  <canvas id="missionMap"></canvas>
+  <div class="map-legend">
+    <span><span class="dot" style="background:#5aaeff"></span>Orion (nu)</span>
+    <span><span class="dot" style="background:rgba(255,255,255,0.3)"></span>Traject</span>
+    <span><span class="dot" style="background:#4ade80"></span>Aarde</span>
+    <span><span class="dot" style="background:#c8c8c8"></span>Maan</span>
+    <span><span class="dot" style="background:#f97316"></span>Kennedy SC</span>
+    <span><span class="dot" style="background:#06b6d4"></span>Splashdown</span>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#2e7eb8"></div>Slaap</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#6aab2a"></div>Maaltijd</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9b4dca"></div>Sport</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e84118"></div>Motorvuring</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#5aaeff"></div>Systemen</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#00e0b0"></div>Comm</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a044ff"></div>Wetenschap</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff9f43"></div>Medisch</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffd32a"></div>Sleutelmoment</div>
+</div>
+<div class="source-note">📄 Dag 1–2 = werkelijke tijden NASA liveblog · Dag 3–10 = officieel NASA planningsdocument · Telemetrie = berekend o.b.v. vluchtfasen</div>
+<div class="timeline-wrap" id="timeline"></div>
+
+<script>
+const LAUNCH = new Date('2026-04-01T22:35:12Z');
+function met(s){const[d,t]=s.split('/');const[h,m]=t.split(':').map(Number);return new Date(LAUNCH.getTime()+(parseInt(d)*86400+h*3600+m*60)*1000);}
+const SPLASH = met('09/01:46');
+const MOON_DIST = 384400; // km average Earth-Moon distance
+
+const ICONS={sleep:'😴',meal:'🍽️',exercise:'💪',burn:'🔥',sys:'⚙️',sci:'🔬',comm:'📡',med:'🩺',key:'⭐'};
+
+// ── TELEMETRY CALCULATION ──
+// Based on actual mission phases and known milestones
+function calcTelemetry(now) {
+  const elMs = now - LAUNCH;
+  const elH = elMs / 3600000; // hours elapsed
+  const totalH = (SPLASH - LAUNCH) / 3600000;
+
+  // Key mission distances (km from Earth center, km/h speed)
+  // Phase 1: 0-2h — ascent + HEO insertion (~0 to 70,000 km, 28,000 km/h)
+  // Phase 2: 2-25h — HEO orbit (~70,000 km circular, 5,000 km/h orbital)
+  // Phase 3: 25-97h — translunar coast (70,000 to 401,000 km, slowing from 39,400 to ~3,200 km/h)
+  // Phase 4: 97-121h — near moon + flyby (401,000 km max, ~3,200 km/h)
+  // Phase 5: 121-216h — return coast (401,000 to 0 km, speeding up to 40,000 km/h)
+  // Phase 6: last 1h — reentry
+
+  const TLI_H = (met('01/01:37') - LAUNCH) / 3600000;
+  const CLOSE_H = (met('05/01:23') - LAUNCH) / 3600000;
+  const MAX_H = (met('05/01:27') - LAUNCH) / 3600000;
+  const SOI_EXIT_H = (met('05/19:47') - LAUNCH) / 3600000;
+  const ENTRY_H = (met('09/01:33') - LAUNCH) / 3600000;
+
+  let dist = 0, speed = 0;
+
+  if (elH < 0) {
+    dist = 0; speed = 0;
+  } else if (elH < 2) {
+    // Ascent: 0 to 70,000 km over 2h
+    const t = elH / 2;
+    dist = t * 70000;
+    speed = 28000 - t * 23000; // 28000 down to 5000
+  } else if (elH < TLI_H) {
+    // HEO orbit: stay around 50,000-70,000 km (elliptical)
+    const phase = (elH - 2) / (TLI_H - 2) * Math.PI * 2;
+    dist = 55000 + Math.sin(phase) * 15000;
+    speed = 4500 + Math.cos(phase) * 500;
+  } else if (elH < CLOSE_H) {
+    // Translunar coast: 70,000 → 401,056 km, slowing
+    const t = (elH - TLI_H) / (CLOSE_H - TLI_H);
+    dist = 70000 + t * (401056 - 70000);
+    // Speed: starts ~39,400 km/h, slows to ~3,200 km/h
+    speed = 39400 * Math.pow(1 - t, 0.6) + 3200 * t;
+  } else if (elH < SOI_EXIT_H) {
+    // Lunar flyby: near 401,000 km, swinging around
+    const t = (elH - CLOSE_H) / (SOI_EXIT_H - CLOSE_H);
+    // Arc around moon: dist goes 401056 → 384400 (moon surface) → back out
+    const arc = Math.sin(t * Math.PI);
+    dist = 401056 - arc * 17000;
+    speed = 3200 + arc * 1800;
+  } else if (elH < ENTRY_H) {
+    // Return coast: speeding up from ~3,200 to ~40,000 km/h
+    const t = (elH - SOI_EXIT_H) / (ENTRY_H - SOI_EXIT_H);
+    dist = 401056 * (1 - t);
+    speed = 3200 + t * 36800;
+  } else {
+    dist = Math.max(0, (1 - (elH - ENTRY_H) / 0.3) * 5000);
+    speed = 40000;
+  }
+
+  const moonDist = Math.abs(MOON_DIST - dist);
+  const signalDelay = (dist / 299792).toFixed(1);
+
+  return {
+    earthDist: Math.round(dist),
+    moonDist: Math.round(moonDist),
+    speed: Math.round(speed),
+    signalDelay
+  };
+}
+
+// ── MAP DRAWING ──
+function drawMap(now) {
+  const canvas = document.getElementById('missionMap');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 24;
+  const H = Math.round(W * 0.38);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Background
+  ctx.fillStyle = 'rgba(4,8,20,0.95)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(90,174,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Layout: Earth left, Moon right
+  const earthX = W * 0.12, earthY = H * 0.5;
+  const moonX  = W * 0.88, moonY  = H * 0.5;
+
+  // Earth glow
+  const earthGlow = ctx.createRadialGradient(earthX, earthY, 0, earthX, earthY, 30);
+  earthGlow.addColorStop(0, 'rgba(74,222,128,0.3)');
+  earthGlow.addColorStop(1, 'rgba(74,222,128,0)');
+  ctx.fillStyle = earthGlow;
+  ctx.beginPath(); ctx.arc(earthX, earthY, 30, 0, Math.PI*2); ctx.fill();
+
+  // Earth
+  const earthGrad = ctx.createRadialGradient(earthX-3, earthY-3, 2, earthX, earthY, 14);
+  earthGrad.addColorStop(0, '#6ee7b7');
+  earthGrad.addColorStop(0.5, '#059669');
+  earthGrad.addColorStop(1, '#064e3b');
+  ctx.fillStyle = earthGrad;
+  ctx.beginPath(); ctx.arc(earthX, earthY, 14, 0, Math.PI*2); ctx.fill();
+
+  // Kennedy Space Center dot
+  ctx.fillStyle = '#f97316';
+  ctx.beginPath(); ctx.arc(earthX+8, earthY-8, 3, 0, Math.PI*2); ctx.fill();
+
+  // San Diego splashdown dot
+  ctx.fillStyle = '#06b6d4';
+  ctx.beginPath(); ctx.arc(earthX-6, earthY+9, 3, 0, Math.PI*2); ctx.fill();
+
+  // Moon glow
+  const moonGlow = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, 22);
+  moonGlow.addColorStop(0, 'rgba(200,200,200,0.15)');
+  moonGlow.addColorStop(1, 'rgba(200,200,200,0)');
+  ctx.fillStyle = moonGlow;
+  ctx.beginPath(); ctx.arc(moonX, moonY, 22, 0, Math.PI*2); ctx.fill();
+
+  // Moon
+  const moonGrad = ctx.createRadialGradient(moonX-3, moonY-3, 2, moonX, moonY, 10);
+  moonGrad.addColorStop(0, '#e5e7eb');
+  moonGrad.addColorStop(0.6, '#9ca3af');
+  moonGrad.addColorStop(1, '#4b5563');
+  ctx.fillStyle = moonGrad;
+  ctx.beginPath(); ctx.arc(moonX, moonY, 10, 0, Math.PI*2); ctx.fill();
+
+  // Labels
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(74,222,128,0.8)';
+  ctx.textAlign = 'center';
+  ctx.fillText('AARDE', earthX, earthY + 22);
+  ctx.fillStyle = 'rgba(200,200,200,0.6)';
+  ctx.fillText('MAAN', moonX, moonY + 18);
+
+  // ── TRAJECTORY PATH ──
+  const elH = (now - LAUNCH) / 3600000;
+  const TLI_H = (met('01/01:37') - LAUNCH) / 3600000;
+  const CLOSE_H = (met('05/01:23') - LAUNCH) / 3600000;
+  const SOI_EXIT_H = (met('05/19:47') - LAUNCH) / 3600000;
+  const ENTRY_H = (met('09/01:33') - LAUNCH) / 3600000;
+  const TOTAL_H = (SPLASH - LAUNCH) / 3600000;
+
+  // Map distance to X position
+  function distToX(dist) {
+    // 0 km = earthX, 401056 km = moonX
+    return earthX + (dist / 401056) * (moonX - earthX);
+  }
+
+  // Generate trajectory points
+  function getPos(h) {
+    let dist = 0, yOffset = 0;
+    if (h < 0) { return {x: earthX, y: earthY}; }
+    else if (h < 2) {
+      const t = h / 2;
+      dist = t * 70000;
+      yOffset = -Math.sin(t * Math.PI) * H * 0.12;
+    } else if (h < TLI_H) {
+      const t = (h - 2) / (TLI_H - 2);
+      const phase = t * Math.PI * 2;
+      dist = 55000 + Math.sin(phase) * 15000;
+      yOffset = -Math.sin(phase * 0.5) * H * 0.08;
+    } else if (h < CLOSE_H) {
+      const t = (h - TLI_H) / (CLOSE_H - TLI_H);
+      dist = 70000 + t * (401056 - 70000);
+      yOffset = -Math.sin(t * Math.PI) * H * 0.22;
+    } else if (h < SOI_EXIT_H) {
+      const t = (h - CLOSE_H) / (SOI_EXIT_H - CLOSE_H);
+      const arc = Math.sin(t * Math.PI);
+      dist = 401056 - arc * 17000;
+      yOffset = Math.sin(t * Math.PI * 1.5) * H * 0.18;
+    } else if (h < ENTRY_H) {
+      const t = (h - SOI_EXIT_H) / (ENTRY_H - SOI_EXIT_H);
+      dist = 401056 * (1 - t);
+      yOffset = Math.sin((1-t) * Math.PI) * H * 0.15;
+    } else {
+      dist = 0;
+      yOffset = 0;
+    }
+    return { x: distToX(dist), y: earthY + yOffset };
+  }
+
+  // Draw full planned path (faint)
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  for (let i = 0; i <= 200; i++) {
+    const h = (i / 200) * TOTAL_H;
+    const p = getPos(h);
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw traveled path (bright)
+  if (elH > 0) {
+    const steps = Math.min(Math.ceil(elH * 3), 200);
+    ctx.beginPath();
+    const grad = ctx.createLinearGradient(earthX, 0, distToX(Math.min(elH/TOTAL_H, 1) * 401056), 0);
+    grad.addColorStop(0, 'rgba(90,174,255,0.6)');
+    grad.addColorStop(1, 'rgba(0,224,176,0.9)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2;
+    for (let i = 0; i <= steps; i++) {
+      const h = (i / steps) * Math.min(elH, TOTAL_H);
+      const p = getPos(h);
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+
+    // Orion current position
+    const curPos = getPos(Math.min(elH, TOTAL_H));
+
+    // Glow
+    const orionGlow = ctx.createRadialGradient(curPos.x, curPos.y, 0, curPos.x, curPos.y, 14);
+    orionGlow.addColorStop(0, 'rgba(90,174,255,0.4)');
+    orionGlow.addColorStop(1, 'rgba(90,174,255,0)');
+    ctx.fillStyle = orionGlow;
+    ctx.beginPath(); ctx.arc(curPos.x, curPos.y, 14, 0, Math.PI*2); ctx.fill();
+
+    // Orion dot
+    ctx.fillStyle = '#5aaeff';
+    ctx.beginPath(); ctx.arc(curPos.x, curPos.y, 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Orion label
+    ctx.fillStyle = '#5aaeff';
+    ctx.font = 'bold 9px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ORION', curPos.x, curPos.y - 11);
+  }
+
+  // Distance scale
+  ctx.fillStyle = 'rgba(61,90,122,0.8)';
+  ctx.font = '8px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('0', earthX, H - 6);
+  ctx.fillText('~384.000 km', moonX, H - 6);
+}
+
+const DAYS = [
+{day:1,date:'1–2 april',title:'Lancering, aardbaan & eerste slaap',emoji:'🚀',events:[
+  {utc:LAUNCH,met:'00/00:00',exact:true,type:'key',title:'LANCERING',desc:'SLS lanceert vanaf LC-39B. 8,8 miljoen pond stuwkracht. Lancering om 00:35 NL.'},
+  {utc:met('00/00:08'),met:'~00/00:08',type:'sys',title:'Kernfase scheidt — crew in ruimte',desc:'Hoofdmotor cutoff. Kernfase scheidt. Crew officieel in de ruimte.'},
+  {utc:met('00/00:18'),met:'~00/00:18',type:'sys',title:'Zonnepanelen uitgevouwen',desc:'Alle vier solar array wings uitgevouwen. Orion heeft eigen stroom.'},
+  {utc:met('00/00:50'),met:'00/00:50',exact:true,type:'burn',title:'ICPS Perigee Raise Maneuver 1',desc:'ICPS vuurt: baan omhoog naar 115 mijl onderkant.'},
+  {utc:met('00/01:08'),met:'~00/01:08',type:'meal',title:'Maaltijd 1',desc:'Eerste maaltijd in de ruimte. Crew trekt ruimtepakken uit.'},
+  {utc:met('00/01:48'),met:'00/01:48',exact:true,type:'burn',title:'ICPS Apogee Raise Burn',desc:'Tweede ICPS-brand: baan naar 43.730 mijl apogee. Hoge aardbaan bereikt.'},
+  {utc:met('00/02:30'),met:'~00/02:30',type:'sys',title:'Systemen checken — toilet, water, CO₂',desc:'Crew controleert drinkwater, toilet, CO₂-scrubber en levensondersteuning.'},
+  {utc:met('00/03:24'),met:'00/03:24',exact:true,type:'key',title:'Orion scheidt van ICPS',desc:'Veerssysteem scheidt Orion van de ICPS-trap. Orion vliegt volledig zelfstandig.'},
+  {utc:met('00/04:00'),met:'~00/04:00',type:'sys',title:'PROX OPS Demo — handmatig sturen',desc:'Victor Glover bestuurt Orion handmatig rondom de afgedankte ICPS-trap. Test voor toekomstige dockingmissies. Duurt ca. 70 minuten.'},
+  {utc:met('00/05:20'),met:'~00/05:20',type:'sys',title:'ICPS Disposal Burn',desc:'ICPS voert afstoteringsmanoeuvre uit richting Stille Oceaan.'},
+  {utc:met('00/06:00'),met:'~00/06:00',type:'meal',title:'Maaltijd 2',desc:'Tweede maaltijd. Crew maakt capsule klaar voor de nacht.'},
+  {utc:met('00/08:30'),met:'~00/08:30',type:'sleep',title:'😴 SLAAP 1 — 4 uur',desc:'Crew kruipt in slaapzakken (~09:05 NL). Koch vraagt Houston om een weksong na 4 uur.'},
+  {utc:met('00/12:25'),met:'00/12:25',exact:true,type:'sys',title:'🔔 WEKKER — 13:00 NL',desc:'Crew wordt om 13:00 NL gewekt (07:00 EDT). Briefing voor de perigee raise burn.'},
+  {utc:met('00/13:00'),met:'~00/13:00',type:'burn',title:'Perigee Raise Burn (Orion motor)',desc:'Orion\'s eigen motor vuurt (~13:35 NL). Verhoogt het laagste punt van de baan. Voorbereiding op TLI morgen.'},
+  {utc:met('00/13:30'),met:'~00/13:30',type:'med',title:'Medische dagconferentie 1',desc:'Dagelijkse medische check-in met Houston.'},
+  {utc:met('00/13:45'),met:'~00/13:45',type:'comm',title:'DSN Noodcomm check',desc:'Test noodcommunicatie via Deep Space Network op verste punt van de aardbaan. Verplicht vóór TLI.'},
+  {utc:met('00/15:05'),met:'~00/15:05',type:'sleep',title:'😴 SLAAP 2 — 4,5 uur',desc:'Crew gaat terug slapen (~15:40 NL). Hoofdslaap vluchtdag 1.'},
+]},
+{day:2,date:'3 april',title:'TLI — Koers naar de maan',emoji:'🌙',events:[
+  {utc:met('00/16:35'),met:'~00/16:35',type:'sys',title:'Wekker dag 2 — vluchtdag 2 start',desc:'Crew wordt gewekt (~17:10 NL). Start vluchtdag 2.'},
+  {utc:met('00/17:00'),met:'~00/17:00',type:'meal',title:'Maaltijd 1 dag 2',desc:'Ontbijt.'},
+  {utc:met('00/17:30'),met:'~00/17:30',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Vliewielloefeningen (30–60 min) op het compacte trainingsapparaat bij het luik.'},
+  {utc:met('00/19:00'),met:'~00/19:00',type:'sys',title:'TLI voorbereiding — Koch',desc:'Koch configureert Orion voor de grote motorvuring. Go/No-Go beslissing Mission Control.'},
+  {utc:met('00/19:30'),met:'~00/19:30',type:'meal',title:'Maaltijd 2 dag 2',desc:'Gemeenschappelijke maaltijd (60 min).'},
+  {utc:met('01/01:37'),met:'~01/01:37',type:'burn',title:'🔥 TLI — TRANSLUNAR INJECTION',desc:'Orion ESM-motor vuurt ~30 min. Snelheid: 39.400 km/u. Orion verlaat de aardbaan definitief op vrije-terugkeerbaan. Onomkeerbaar.'},
+  {utc:met('01/02:30'),met:'~01/02:30',type:'comm',title:'Live video-downlink #1',desc:'Eerste publieke live gesprek vanuit de diepe ruimte.'},
+  {utc:met('01/03:00'),met:'~01/03:00',type:'sys',title:'OCSS pakken uitgetrokken',desc:'Oranje ruimtepakken gaan definitief uit. Gewone kleding voor de rest van de missie.'},
+  {utc:met('01/04:00'),met:'~01/04:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Koch en Hansen doen sport in de tweede helft van de dag.'},
+  {utc:met('01/06:00'),met:'~01/06:00',type:'meal',title:'Maaltijd 3 dag 2',desc:'Derde maaltijd.'},
+  {utc:met('01/07:00'),met:'~01/07:00',type:'sys',title:'CM/SM Survey',desc:'Visuele inspectie buitenkant Orion via camera\'s.'},
+  {utc:met('01/09:00'),met:'~01/09:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Hoofdslaap dag 2. Orion reist richting maan.'},
+]},
+{day:3,date:'4 april',title:'Uitreis — OTC-1 & medische tests',emoji:'✨',events:[
+  {utc:met('02/00:00'),met:'~02/00:00',type:'sys',title:'Wekker dag 3',desc:'Dagbriefing van Mission Control Houston.'},
+  {utc:met('02/01:00'),met:'~02/01:00',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('02/01:30'),met:'~02/01:30',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Dagelijkse vliewielloefeningen. Minimaal 30 min per dag.'},
+  {utc:met('02/00:07'),met:'02/00:07',exact:true,type:'burn',title:'OTC-1 — Outbound Trajectory Correction 1',desc:'Eerste koerscorrectiebrand. Hansen bereidt dit voor. Orion op koers.'},
+  {utc:met('02/04:00'),met:'~02/04:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'60 min gedeelde maaltijd.'},
+  {utc:met('02/04:30'),met:'~02/04:30',type:'med',title:'CPR-demonstratie & medische kit check',desc:'Glover, Koch en Hansen tonen reanimatie in de ruimte. Medische kit gecontroleerd.'},
+  {utc:met('02/06:00'),met:'~02/06:00',type:'comm',title:'DSN Noodcommunicatietest',desc:'Koch test noodcommunicatie via het Deep Space Network.'},
+  {utc:met('02/07:00'),met:'~02/07:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Tweede sportronde van de dag.'},
+  {utc:met('02/08:00'),met:'~02/08:00',type:'sci',title:'24u akoestische meting start',desc:'Begin van 24-uurs geluidsmeting aan boord.'},
+  {utc:met('02/09:00'),met:'~02/09:00',type:'meal',title:'Maaltijd 3',desc:'Avondmaaltijd.'},
+  {utc:met('02/10:00'),met:'~02/10:00',type:'comm',title:'Live downlink #2',desc:'Tweede publiek video-gesprek.'},
+  {utc:met('02/11:00'),met:'~02/11:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Nacht. Afstand: ~300.000 km.'},
+]},
+{day:4,date:'5 april',title:'Uitreis — OTC-2',emoji:'🛸',events:[
+  {utc:met('03/00:00'),met:'~03/00:00',type:'sys',title:'Wekker dag 4',desc:'24u akoestische meting eindigt.'},
+  {utc:met('03/00:30'),met:'~03/00:30',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('03/01:00'),met:'~03/01:00',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Ochtend sport.'},
+  {utc:met('03/00:12'),met:'03/00:12',exact:true,type:'burn',title:'OTC-2 — Outbound Trajectory Correction 2',desc:'Tweede koerscorrectie. Orion op perfecte koers voor maanpassage.'},
+  {utc:met('03/04:00'),met:'~03/04:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'60 min gemeenschappelijke maaltijd.'},
+  {utc:met('03/05:00'),met:'~03/05:00',type:'sci',title:'AVATAR wetenschapsexperiment',desc:'Organ-on-a-chip: effecten straling en gewichtloosheid op menselijk weefsel.'},
+  {utc:met('03/07:00'),met:'~03/07:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Middag sport.'},
+  {utc:met('03/08:00'),met:'~03/08:00',type:'med',title:'Medische dagcheck',desc:'Dagelijkse medische conferentie. Pulse ox meting.'},
+  {utc:met('03/09:00'),met:'~03/09:00',type:'meal',title:'Maaltijd 3',desc:'Avondmaaltijd.'},
+  {utc:met('03/10:00'),met:'~03/10:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Nacht. Morgen naderen we de maansfeer.'},
+]},
+{day:5,date:'6 april',title:'Maansfeer bereikt & ruimtepaktests',emoji:'🌕',events:[
+  {utc:met('04/00:00'),met:'~04/00:00',type:'sys',title:'Wekker dag 5',desc:'Vandaag bereiken we de maansfeer.'},
+  {utc:met('04/00:30'),met:'~04/00:30',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('04/01:00'),met:'~04/01:00',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Ochtend sport.'},
+  {utc:met('04/04:23'),met:'04/04:23',exact:true,type:'burn',title:'OTC-3 — Outbound Trajectory Correction 3',desc:'Laatste koerscorrectie uitreis. Definitieve instelling voor maanpassage.'},
+  {utc:met('04/05:00'),met:'~04/05:00',type:'sys',title:'Ruimtepaktests — OCSS suite',desc:'Volledige ochtend: aantrekken OCSS-pakken, stoelen installeren, eten via helmpoort.'},
+  {utc:met('04/06:59'),met:'04/06:59',exact:true,type:'key',title:'⭐ LUNAR SOI — Maansfeer bereikt',desc:'Orion kruist de Sphere of Influence van de maan. Maan is nu dominant.'},
+  {utc:met('04/07:05'),met:'04/07:05',exact:true,type:'sys',title:'SAT Mode Test',desc:'Satellietsysteemtest in de maanomgeving.'},
+  {utc:met('04/08:00'),met:'~04/08:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'60 min gemeenschappelijke maaltijd.'},
+  {utc:met('04/09:00'),met:'~04/09:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Middag sport.'},
+  {utc:met('04/12:45'),met:'04/12:45',exact:true,type:'sys',title:'CM/SM Survey 2',desc:'Tweede buitenkant-inspectie Orion.'},
+  {utc:met('04/21:02'),met:'04/21:02',exact:true,type:'key',title:'🏅 Apollo 13 afstandsrecord gebroken',desc:'Orion passeert 401.056 km. Nieuw mensenheidsrecord in aantocht.'},
+  {utc:met('04/22:00'),met:'~04/22:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Nacht. Morgen: de maanpassage.'},
+]},
+{day:6,date:'7 april',title:'🏆 MAANPASSAGE — Verste punt ooit',emoji:'🌑',events:[
+  {utc:met('05/00:00'),met:'~05/00:00',type:'sys',title:'Wekker dag 6',desc:'De maanpassage begint binnen een uur.'},
+  {utc:met('05/01:23'),met:'05/01:23',exact:true,type:'key',title:'🌑 CLOSEST APPROACH — 6.600 km',desc:'Orion op 6.600 km van de achterzijde van de maan. Radiocontact verbroken. De maan vult het raam als een basketbal op armlengte.'},
+  {utc:met('05/01:27'),met:'05/01:27',exact:true,type:'key',title:'🏆 ABSOLUUT RECORD — Verste punt ooit',desc:'>401.056 km van de Aarde. Nieuw mensenheidsrecord. Earthrise-foto\'s gemaakt.'},
+  {utc:met('05/02:30'),met:'~05/02:30',type:'comm',title:'Communicatie hersteld',desc:'Orion aan voorzijde maan. Radiocontact met Houston hersteld.'},
+  {utc:met('05/03:00'),met:'~05/03:00',type:'sci',title:'Maanobservaties & foto\'s',desc:'Uitgebreide fotosessie maanoppervlak. National Geographic filmopnames.'},
+  {utc:met('05/04:00'),met:'~05/04:00',type:'meal',title:'Maaltijd 1 — gemeenschappelijk',desc:'60 min gemeenschappelijke maaltijd na de historische passage.'},
+  {utc:met('05/05:00'),met:'~05/05:00',type:'comm',title:'Live persconferentie vanuit ruimte',desc:'Crew geeft live persconferentie op verste punt ooit.'},
+  {utc:met('05/07:00'),met:'~05/07:00',type:'key',title:'Slingshot bevestigd — terugreis',desc:'Maanzwaartekracht heeft Orion teruggekaatst. Vrije-terugkeerbaan actief.'},
+  {utc:met('05/10:00'),met:'~05/10:00',type:'meal',title:'Maaltijd 2 & 3',desc:'Maaltijden en debriefing.'},
+  {utc:met('05/19:47'),met:'05/19:47',exact:true,type:'key',title:'⭐ LUNAR SOI EXIT — Maansfeer verlaten',desc:'Orion verlaat de gravitationele sfeer van de maan. Aarde is weer dominant.'},
+  {utc:met('05/20:00'),met:'~05/20:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Nacht. Terugreis begonnen.'},
+]},
+{day:7,date:'8 april',title:'Terugreis — Vrije dag & RTC-1',emoji:'↩️',events:[
+  {utc:met('06/00:00'),met:'~06/00:00',type:'sys',title:'Wekker dag 7 — VRIJE DAG',desc:'Vluchtdag 7 = vrije dag. Geen grote verplichtingen.'},
+  {utc:met('06/01:00'),met:'~06/01:00',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('06/02:00'),met:'~06/02:00',type:'sci',title:'Vrije tijd — persoonlijke activiteiten',desc:'Fotografie, muziek, persoonlijke reflectie. Aarde wordt groter in het raam.'},
+  {utc:met('06/04:23'),met:'06/04:23',exact:true,type:'burn',title:'RTC-1 — Return Trajectory Correction 1',desc:'Eerste correctiebrand terugweg. Orion gericht op San Diego.'},
+  {utc:met('06/05:00'),met:'~06/05:00',type:'sci',title:'K-RadCube & TACHELES experimenten',desc:'Stralingsmetingen voor Korea en Duitsland.'},
+  {utc:met('06/06:00'),met:'~06/06:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'60 min gedeelde maaltijd.'},
+  {utc:met('06/07:00'),met:'~06/07:00',type:'exercise',title:'Sport — hele crew',desc:'Iedereen sport op de vrije dag.'},
+  {utc:met('06/09:00'),met:'~06/09:00',type:'comm',title:'Live downlink #3',desc:'Publiek gesprek. Indrukken maanpassage.'},
+  {utc:met('06/10:00'),met:'~06/10:00',type:'meal',title:'Maaltijd 3',desc:'Avondmaaltijd.'},
+  {utc:met('06/11:00'),met:'~06/11:00',type:'sleep',title:'😴 SLAAP — 9 uur',desc:'Iets langere slaap op de vrije dag.'},
+]},
+{day:8,date:'9 april',title:'Terugreis — Stralingsnoodtest & handbesturing',emoji:'☀️',events:[
+  {utc:met('07/00:00'),met:'~07/00:00',type:'sys',title:'Wekker dag 8',desc:'Aarde groeit in het raam.'},
+  {utc:met('07/01:00'),met:'~07/01:00',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('07/01:30'),met:'~07/01:30',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Ochtend sport.'},
+  {utc:met('07/03:00'),met:'~07/03:00',type:'sys',title:'FCS Checkouts',desc:'Vluchtsysteemcontroles voorbereiding terugkeer.'},
+  {utc:met('07/04:00'),met:'~07/04:00',type:'sci',title:'Radiation Shelter Demo',desc:'Noodprocedure voor zonnestralingsevenementen. Test storm shelter.'},
+  {utc:met('07/06:00'),met:'~07/06:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'60 min gedeelde maaltijd.'},
+  {utc:met('07/07:00'),met:'~07/07:00',type:'sys',title:'Handmatige besturing (Man PLT)',desc:'Koch en Wiseman besturen Orion handmatig.'},
+  {utc:met('07/08:00'),met:'~07/08:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Middag sport.'},
+  {utc:met('07/09:00'),met:'~07/09:00',type:'med',title:'Medische dagcheck',desc:'Pulse ox, bloeddruk, dagelijkse medische conferentie.'},
+  {utc:met('07/10:00'),met:'~07/10:00',type:'meal',title:'Maaltijd 3',desc:'Avondmaaltijd.'},
+  {utc:met('07/17:30'),met:'07/17:30',exact:true,type:'sys',title:'FCS Checkouts 2',desc:'Tweede vluchtsysteemcheck. Alle systemen groen.'},
+  {utc:met('07/11:00'),met:'~07/11:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Nacht.'},
+]},
+{day:9,date:'10 april',title:'Laatste dag — terugkeervoorbereiding',emoji:'🌍',events:[
+  {utc:met('08/00:00'),met:'~08/00:00',type:'sys',title:'Wekker dag 9',desc:'Laatste volledige dag in de ruimte.'},
+  {utc:met('08/01:00'),met:'~08/01:00',type:'meal',title:'Maaltijd 1',desc:'Ontbijt.'},
+  {utc:met('08/01:30'),met:'~08/01:30',type:'exercise',title:'Sport — Wiseman & Glover',desc:'Laatste ochtend sport in de ruimte.'},
+  {utc:met('08/03:00'),met:'~08/03:00',type:'sys',title:'Terugkeerprocedures doorlopen',desc:'Studie terugkeer: hitteschild, parachutes, splashdown.'},
+  {utc:met('08/04:33'),met:'08/04:33',exact:true,type:'burn',title:'RTC-2 — Return Trajectory Correction 2',desc:'Tweede correctiebrand. Orion gericht op inreishoek San Diego.'},
+  {utc:met('08/06:00'),met:'~08/06:00',type:'meal',title:'Maaltijd 2 — gemeenschappelijk',desc:'Gedeelde maaltijd.'},
+  {utc:met('08/07:00'),met:'~07/07:00',type:'exercise',title:'Sport — Koch & Hansen',desc:'Middag sport.'},
+  {utc:met('08/08:00'),met:'~08/08:00',type:'sys',title:'Entry Stow — alles vastmaken',desc:'Alle losse voorwerpen vastgezet. Cabin Config voor inreis.'},
+  {utc:met('08/10:00'),met:'~08/10:00',type:'comm',title:'Laatste live downlink',desc:'Laatste publiek video-gesprek. Crew blikt terug.'},
+  {utc:met('08/11:00'),met:'~08/11:00',type:'meal',title:'Maaltijd 3 — laatste in ruimte',desc:'Laatste maaltijd voor terugkeer.'},
+  {utc:met('08/20:33'),met:'08/20:33',exact:true,type:'burn',title:'RTC-3 — Return Trajectory Correction 3',desc:'Derde en nauwkeurigste correctiebrand. Definitieve afstemming inreiskoers.'},
+  {utc:met('08/12:00'),met:'~08/12:00',type:'sleep',title:'😴 SLAAP — 8,5 uur',desc:'Laatste nacht. Morgen: terugkeer.'},
+]},
+{day:10,date:'11 april',title:'Terugkeer naar Aarde & Splashdown',emoji:'🌊',events:[
+  {utc:met('09/00:00'),met:'~09/00:00',type:'sys',title:'Wekker — terugkeerdag',desc:'Laatste wekker in de ruimte. Definitieve configuratiechecks.'},
+  {utc:met('09/00:30'),met:'~09/00:30',type:'sys',title:'OCSS pakken aan — definitief',desc:'Oranje pakken aan. Helmen vergrendeld. Stoelen geïnstalleerd.'},
+  {utc:met('09/00:45'),met:'~09/00:45',type:'sys',title:'Cabin Depress & lekcheck',desc:'Drukcheck en lekdetectie.'},
+  {utc:met('09/01:13'),met:'09/01:13',exact:true,type:'key',title:'CM/SM SCHEIDING',desc:'Crew Module scheidt van het Europese Service Module. ESM verbrandt.'},
+  {utc:met('09/01:33'),met:'09/01:33',exact:true,type:'burn',title:'🔥 ENTRY INTERFACE — 40.000 km/u',desc:'Inreis bij 122 km hoogte. Buitenwand: 2.800°C. Radiosilentie.'},
+  {utc:met('09/01:41'),met:'~09/01:41',type:'key',title:'Parachutes ontplooid',desc:'Drie hoofdparachutes: 500 km/u → 28 km/u.'},
+  {utc:met('09/01:46'),met:'09/01:46',exact:true,type:'key',title:'🌊 SPLASHDOWN — San Diego',desc:'Orion raakt water. Missie voltooid: 10 dagen, ~1,1 miljoen km.'},
+  {utc:met('09/02:30'),met:'~09/02:30',type:'key',title:'Bergingsoperatie — US Navy',desc:'Navy brengt capsule en crew aan boord van marineschip.'},
+  {utc:met('09/03:30'),met:'~09/03:30',type:'comm',title:'Persconferentie — missie voltooid',desc:'NASA post-missie persconferentie.'},
+]},
+];
+
+function render(){
+  const wrap=document.getElementById('timeline');
+  wrap.innerHTML='';
+  const hues=[210,220,195,205,260,35,155,175,10,205];
+  DAYS.forEach((day,di)=>{
+    const sec=document.createElement('div');
+    sec.className='day-section';sec.id=`day-${day.day}`;
+    const hdr=document.createElement('div');
+    hdr.className='day-header';
+    hdr.innerHTML=`<div class="day-num" style="color:hsl(${hues[di]},72%,62%)">${day.day}</div>
+      <div class="day-meta"><div class="d-date">${day.date}</div><div class="d-title">${day.title}</div></div>
+      <div class="day-emoji">${day.emoji}</div>
+      <div class="day-status" id="st${day.day}">—</div>
+      <div class="chevron">▼</div>`;
+    hdr.onclick=()=>sec.classList.toggle('open');
+    const evWrap=document.createElement('div');
+    evWrap.className='events-wrap';
+    day.events.forEach((ev,ei)=>{
+      const row=document.createElement('div');
+      row.className=`event-row type-${ev.type}`;
+      row.id=`ev-${di}-${ei}`;
+      const nlT=toNL(ev.utc);
+      const tD=ev.exact?nlT:`~${nlT}`;
+      const icon=ICONS[ev.type]||'•';
+      row.innerHTML=`<div class="type-bar"></div>
+        <div class="e-time-col"><div class="e-time">${tD}</div><div class="e-met">${ev.met||''}</div></div>
+        <div class="e-content">
+          <div class="e-icon-title"><span class="e-icon">${icon}</span><span class="e-title">${ev.title}</span></div>
+          <div class="e-desc">${ev.desc}</div>
+        </div>`;
+      evWrap.appendChild(row);
+    });
+    sec.appendChild(hdr);sec.appendChild(evWrap);wrap.appendChild(sec);
+  });
+}
+
+function toNL(d){return d.toLocaleTimeString('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit'});}
+function pad(n){return String(n).padStart(2,'0');}
+function fmt(n){return n.toLocaleString('nl-NL');}
+
+function update(){
+  const now=new Date();
+  document.getElementById('nlTime').textContent=now.toLocaleTimeString('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const elMs=now-LAUNCH;
+  if(elMs>=0){
+    const s=Math.floor(elMs/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sc=s%60;
+    document.getElementById('missionTime').textContent=`T+${d}d ${pad(h)}:${pad(m)}:${pad(sc)}`;
+  } else {
+    const s=Math.floor((LAUNCH-now)/1000);
+    document.getElementById('missionTime').textContent=`T-${pad(Math.floor(s/3600))}:${pad(Math.floor(s%3600/60))}:${pad(s%60)}`;
+  }
+  const rem=SPLASH-now;
+  if(rem>0){const s=Math.floor(rem/1000);document.getElementById('toSplash').textContent=`${Math.floor(s/86400)}d ${pad(Math.floor(s%86400/3600))}h ${pad(Math.floor(s%3600/60))}m`;}
+  else{const el=document.getElementById('toSplash');el.textContent='GELAND ✓';el.style.color='#4ade80';}
+
+  const pct=Math.round(Math.min(Math.max(now-LAUNCH,0),SPLASH-LAUNCH)/(SPLASH-LAUNCH)*100);
+  document.getElementById('missionProgress').style.width=pct+'%';
+  document.getElementById('progressPct').textContent=pct+'%';
+
+  // Telemetry
+  const telem=calcTelemetry(now);
+  document.getElementById('tEarth').textContent=fmt(telem.earthDist);
+  document.getElementById('tMoon').textContent=fmt(telem.moonDist);
+  document.getElementById('tSpeed').textContent=fmt(telem.speed);
+  document.getElementById('tDelay').textContent=telem.signalDelay;
+
+  // Map
+  drawMap(now);
+
+  // Events
+  const flat=[];
+  DAYS.forEach((day,di)=>day.events.forEach((ev,ei)=>flat.push({...ev,di,ei})));
+  let cur=null,nxt=null,curDi=-1;
+  for(let i=0;i<flat.length;i++){
+    const nextT=flat[i+1]?flat[i+1].utc:SPLASH;
+    if(now>=flat[i].utc&&now<nextT){cur=flat[i];nxt=flat[i+1]||null;curDi=flat[i].di;break;}
+  }
+  flat.forEach(ev=>{
+    const r=document.getElementById(`ev-${ev.di}-${ev.ei}`);
+    if(!r)return;
+    r.classList.remove('current-event','past-event');
+    if(ev===cur)r.classList.add('current-event');
+    else if(now>ev.utc)r.classList.add('past-event');
+  });
+  DAYS.forEach((day,di)=>{
+    const sec=document.getElementById(`day-${day.day}`);
+    const st=document.getElementById(`st${day.day}`);
+    if(!sec||!st)return;
+    sec.classList.remove('active-day','past-day','open');
+    const nextFirst=DAYS[di+1]?DAYS[di+1].events[0].utc:SPLASH;
+    if(di===curDi){sec.classList.add('active-day','open');st.className='day-status status-live';st.textContent='● LIVE';}
+    else if(now>=nextFirst){sec.classList.add('past-day');st.className='day-status status-done';st.textContent='✓ Klaar';}
+    else{st.className='day-status status-upcoming';st.textContent='Binnenkort';}
+  });
+  if(cur){
+    document.getElementById('currentPhaseTitle').textContent=`${ICONS[cur.type]||''} ${cur.title}`;
+    document.getElementById('currentPhaseDesc').textContent=cur.desc;
+    document.getElementById('currentPhaseNext').textContent=nxt?`▶ Volgende: ${ICONS[nxt.type]||''} ${nxt.title} — ${nxt.exact?'':'~'}${toNL(nxt.utc)} NL`:'▶ Missie bijna voltooid';
+  } else if(now<LAUNCH){
+    document.getElementById('currentPhaseTitle').textContent='Wachten op lancering…';
+    document.getElementById('currentPhaseDesc').textContent='Lancering gepland op 1 april om 00:35 NL.';
+    document.getElementById('currentPhaseNext').textContent='';
+  } else {
+    document.getElementById('currentPhaseTitle').textContent='Artemis II — Missie Voltooid ✓';
+    document.getElementById('currentPhaseDesc').textContent='Splashdown uitgevoerd. De crew is veilig terug op Aarde.';
+    document.getElementById('currentPhaseNext').textContent='';
+  }
+}
+
+render();update();setInterval(update,1000);
+window.addEventListener('resize',()=>drawMap(new Date()));
+</script>
+</body>
+</html>
